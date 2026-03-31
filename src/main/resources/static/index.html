@@ -1,0 +1,721 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>SQL Agent | 优化分析</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <!-- CodeMirror CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css" rel="stylesheet"/>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="css/base.css"/>
+    <link rel="stylesheet" href="css/layout.css"/>
+    <link rel="stylesheet" href="css/components.css"/>
+    <link rel="stylesheet" href="css/pages.css"/>
+</head>
+<body>
+    <!-- Header -->
+    <header class="w-full px-3 py-4">
+        <div class="soft-card p-4">
+            <div class="flex items-center justify-between app-header-row">
+                <div class="flex items-center gap-4 app-brand-block">
+                    <div class="soft-icon-container w-14 h-14">
+                        <span class="material-symbols-outlined text-3xl" style="color: var(--primary-gradient-start);">auto_awesome</span>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-extrabold" style="color: var(--text-primary);">SQL Agent</h1>
+                        <p class="text-sm font-medium" style="color: var(--text-secondary);">我当前重点打磨优化分析，索引设计还在继续实验</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 app-header-actions">
+                    <button id="languageToggle" onclick="toggleLanguage()" class="soft-button-secondary py-2 px-3 flex items-center gap-2 text-sm">
+                        <span class="material-symbols-outlined text-sm">translate</span>
+                        <span id="languageToggleLabel">English</span>
+                    </button>
+                    <div class="soft-badge primary">
+                        <span class="flex items-center gap-2">
+                            <span class="soft-status-dot success"></span>
+                            在线
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="w-full px-3 flex-1">
+        <div class="flex flex-col lg:flex-row gap-4">
+            <!-- Sidebar Navigation -->
+            <aside class="lg:w-64 flex-shrink-0">
+                <nav class="soft-card p-4 lg:sticky lg:top-4">
+                    <div class="flex flex-col gap-3 app-nav-list">
+                        <button type="button" id="navAnalyze" class="soft-nav-item active flex items-center gap-3 w-full text-left">
+                            <span class="material-symbols-outlined">auto_awesome</span>
+                            <span class="font-bold">优化分析</span>
+                        </button>
+                        <button type="button" id="navWorkload" class="soft-nav-item flex items-center gap-3 w-full text-left" onclick="switchPage('workload')">
+                            <span class="material-symbols-outlined">schema</span>
+                            <span class="font-bold">索引实验（测试）</span>
+                        </button>
+                        <button type="button" id="navHistory" class="soft-nav-item flex items-center gap-3 w-full text-left" onclick="switchPage('history')">
+                            <span class="material-symbols-outlined">history</span>
+                            <span class="font-bold">历史记录</span>
+                        </button>
+                        <button type="button" id="navTables" class="soft-nav-item flex items-center gap-3 w-full text-left" onclick="switchPage('tables')">
+                            <span class="material-symbols-outlined">storage</span>
+                            <span class="font-bold">数据库表结构</span>
+                        </button>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t" style="border-color: var(--border-color);">
+                        <button onclick="location.reload()" class="soft-button w-full py-3 px-4 flex items-center justify-start gap-2">
+                            <span class="material-symbols-outlined">refresh</span>
+                            <span>新建分析</span>
+                        </button>
+                    </div>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 min-w-0">
+                <!-- Analyze Page -->
+                <div id="analyzePage">
+                    <!-- Welcome Section -->
+                    <section class="soft-card p-4 mb-3">
+                        <div class="flex items-start gap-4 mb-4">
+                            <div class="soft-icon-container w-12 h-12 flex-shrink-0">
+                                <span class="material-symbols-outlined text-2xl" style="color: var(--primary-gradient-start);">psychology</span>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold mb-2" style="color: var(--text-primary);">优化分析</h2>
+                                <p class="text-sm leading-relaxed" style="color: var(--text-secondary);">
+                                    这里是我目前打磨最完整的主流程。我先生成候选方案，再用系统执行、校验和评分，把优化结论和证据链一起展示出来。
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Tools Grid -->
+                        <div class="mt-6">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="material-symbols-outlined text-lg" style="color: var(--primary-gradient-start);">construction</span>
+                                <span class="font-bold text-sm" style="color: var(--text-primary);">可用工具</span>
+                            </div>
+                            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2" id="toolsContainer">
+                                <div class="soft-card-inset p-2 text-center">
+                                    <div class="text-xs" style="color: var(--text-tertiary);">加载中...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- SQL Input Section -->
+                    <section class="soft-card p-6 mb-3">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">code</span>
+                                <span class="font-bold" style="color: var(--text-primary);">输入 SQL</span>
+                            </div>
+                            <span class="soft-badge" style="color: var(--text-tertiary);" id="charCount">0 / 1000</span>
+                        </div>
+
+                        <!-- 配置选项 -->
+                        <div class="grid grid-cols-1 gap-4 mb-4">
+                            <!-- Agent 模式占位 -->
+                            <div style="display: none;">
+                                <label class="block text-sm font-medium mb-2" style="color: var(--text-primary);">
+                                    <span class="material-symbols-outlined text-sm align-middle mr-1" style="color: var(--primary-gradient-start);">settings</span>
+                                    Agent 模式
+                                </label>
+                                <select class="hidden" aria-hidden="true">
+                                    <option value="hidden">hidden</option>
+                                    <option value="hidden">hidden</option>
+                                </select>
+                                <p class="text-xs mt-1" style="color: var(--text-tertiary);">
+                                    <span>该区域已停用</span>
+                                </p>
+                            </div>
+
+                            <!-- AI 模型选择 -->
+                            <div>
+                                <label class="block text-sm font-medium mb-2" style="color: var(--text-primary);">
+                                    <span class="material-symbols-outlined text-sm align-middle mr-1" style="color: var(--primary-gradient-start);">psychology</span>
+                                    AI 模型
+                                </label>
+                                <select id="modelSelect" class="w-full px-3 py-2 rounded-lg border text-sm focus:ring-2 focus:ring-offset-2" style="background: var(--background-color); border-color: var(--border-color); color: var(--text-primary);">
+                                    <option value="">加载中...</option>
+                                </select>
+                                <p class="text-xs mt-1" style="color: var(--text-tertiary);">
+                                    可切换不同模型，不同模型的效果和速度会有差异
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm" style="color: var(--primary-gradient-start);">tips_and_updates</span>
+                                <span class="text-sm font-medium" style="color: var(--text-primary);">SQL 样例</span>
+                            </div>
+                            <div class="text-xs" style="color: var(--text-tertiary);">点击样例可直接填充到输入框</div>
+                        </div>
+                        <div id="sqlSamplesContainer" class="flex flex-wrap gap-2 mb-4">
+                            <span class="soft-badge">加载中...</span>
+                        </div>
+
+                        <div class="soft-card-inset p-4 mb-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-medium" style="color: var(--text-tertiary);">SQL 编辑器</span>
+                                <button id="formatSqlBtn" class="soft-button-secondary py-1 px-3 flex items-center gap-1 text-xs" title="格式化 SQL">
+                                    <span class="material-symbols-outlined text-sm">format_align_left</span>
+                                    <span>格式化</span>
+                                </button>
+                            </div>
+                            <div id="sqlEditorWrapper">
+                                <textarea id="sqlInput" class="w-full h-40 bg-transparent border-none focus:ring-0 code-font text-sm resize-none" style="color: var(--text-primary);" spellcheck="false" placeholder="请输入 SELECT 查询语句...
+
+示例:
+SELECT * FROM users WHERE id = 123;
+SELECT * FROM orders WHERE YEAR(created_at) = 2024;" maxlength="1000"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button id="analyzeBtn" class="soft-button py-3 px-6 flex items-center gap-2">
+                                <span>分析 SQL</span>
+                                <span class="material-symbols-outlined">auto_fix_high</span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Error Message -->
+                    <div class="soft-card p-4 mb-3 hidden" id="errorMessage" style="background: linear-gradient(145deg, #fed7d7, #fbbfbf);">
+                        <div class="flex items-start gap-3">
+                            <span class="material-symbols-outlined" style="color: var(--error-color);">error</span>
+                            <span class="text-sm font-medium" style="color: #742a2a;"></span>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div class="soft-card p-12 text-center hidden" id="loading">
+                        <div class="inline-block w-full max-w-3xl">
+                            <div class="w-16 h-16 rounded-full mx-auto mb-4 soft-loading" style="background: linear-gradient(145deg, var(--primary-gradient-start), var(--primary-gradient-end));"></div>
+                            <p class="font-medium mb-2" style="color: var(--text-secondary);">正在分析 SQL，准备候选方案和验证链路...</p>
+
+                            <div class="soft-card-inset p-4 mb-4 soft-progress-shell">
+                                <div class="soft-progress-header">
+                                    <div class="soft-progress-copy">
+                                        <div class="soft-progress-kicker">执行进度</div>
+                                        <div id="progressText" class="soft-progress-title">准备中...</div>
+                                        <div id="progressHint" class="soft-progress-hint">等待系统建立执行链路</div>
+                                    </div>
+                                    <div class="soft-progress-percent-block">
+                                        <span id="progressPercent" class="soft-progress-percent">0%</span>
+                                        <span class="soft-progress-percent-label">接近真实阶段推进</span>
+                                    </div>
+                                </div>
+                                <div class="soft-progress-rail">
+                                    <div id="progressBar" class="soft-progress-fill" style="width: 0%;"></div>
+                                </div>
+                                <div id="progressPhasePills" class="soft-progress-phase-list" aria-label="执行阶段">
+                                    <div class="soft-progress-phase-pill pending" data-phase-key="request">接收请求</div>
+                                    <div class="soft-progress-phase-pill pending" data-phase-key="candidate_generation">生成候选</div>
+                                    <div class="soft-progress-phase-pill pending" data-phase-key="baseline">基线测量</div>
+                                    <div class="soft-progress-phase-pill pending" data-phase-key="candidate_execution">验证方案</div>
+                                    <div class="soft-progress-phase-pill pending" data-phase-key="evaluation">选择最优</div>
+                                    <div class="soft-progress-phase-pill pending" data-phase-key="finalize">整理结果</div>
+                                </div>
+                            </div>
+
+                            <div id="streamProgressPanel" class="mt-4 text-left overflow-y-auto soft-card-inset p-3 text-xs code-font" style="color: var(--text-secondary); max-height: 320px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div class="results" id="results">
+                        <!-- Status Banner -->
+                        <div class="soft-card p-6 mb-3 result-summary-card" id="statusBanner" data-role="statusBanner">
+                            <div class="flex items-center justify-between mb-4 card-header-row result-summary-header">
+                                <h3 class="font-bold text-lg" style="color: var(--text-primary);">分析状态</h3>
+                                <div class="flex items-center gap-3 card-header-actions">
+                                    <div id="statusBadge" data-role="statusBadge"></div>
+                                    <!-- 应用优化按钮（存在索引方案时显示） -->
+                                    <button id="applyOptimizationBtn" data-role="applyOptimizationBtn" class="soft-button px-4 py-2 text-sm hidden" onclick="applyOptimization()">
+                                        <span class="material-symbols-outlined text-sm align-middle mr-1">build</span>
+                                        应用优化
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="soft-card-inset p-4 mb-4 hidden" data-role="strategyInfo" style="display: none; color: var(--text-secondary);"></div>
+                            <div class="soft-card-inset p-4 mb-4 hidden" data-role="phaseSummaryCard" style="display: none;">
+                                <div class="result-phase-summary-header">
+                                    <div>
+                                        <div class="result-phase-summary-kicker">阶段完成摘要</div>
+                                        <div class="result-phase-summary-title">候选生成、验证和选优结果一眼可见</div>
+                                    </div>
+                                    <div class="soft-badge primary" data-role="phaseSummaryBadge">等待结果</div>
+                                </div>
+                                <div class="result-phase-summary-grid" data-role="phaseSummaryGrid"></div>
+                            </div>
+                            <div class="soft-card-inset p-5 hidden" id="noOptimizationBanner" data-role="noOptimizationBanner">
+                                <div class="flex items-start gap-4">
+                                    <div class="soft-icon-container w-10 h-10 flex-shrink-0">
+                                        <span class="material-symbols-outlined" style="color: var(--success-color);">check_circle</span>
+                                    </div>
+                                    <div>
+                                        <div class="font-bold mb-1" style="color: var(--success-color);">性能良好</div>
+                                        <div class="text-sm" style="color: var(--text-secondary);">您的 SQL 已经使用了索引，扫描行数少，性能表现优秀。</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Original SQL Display -->
+                        <div class="soft-card p-6 mb-3" id="originalSqlCard" data-role="originalSqlCard">
+                            <div class="flex items-center justify-between mb-4 card-header-row">
+                                <div class="flex items-center gap-2 card-header-actions">
+                                    <span class="material-symbols-outlined" style="color: var(--text-secondary);">input</span>
+                                    <span class="font-bold" style="color: var(--text-primary);">原始 SQL</span>
+                                </div>
+                                <div class="flex items-center gap-2 card-header-actions">
+                                    <button class="soft-button-secondary py-2 px-3 text-xs flex items-center gap-1" data-copy-field="originalSql" data-copy-label="原始 SQL">
+                                        <span class="material-symbols-outlined text-sm">content_copy</span>
+                                        <span class="font-bold">复制</span>
+                                    </button>
+                                    <span class="soft-badge" style="background: linear-gradient(145deg, #f5f7fa, #e8ecf1); color: var(--text-secondary);">original.sql</span>
+                                </div>
+                            </div>
+                            <div class="soft-code-block p-4">
+                                <pre class="text-sm code-font whitespace-pre-wrap overflow-x-auto"><code id="originalSql" data-role="originalSql" data-field="originalSql" class="original-sql-code" style="color: #a0aec0;"></code></pre>
+                            </div>
+                        </div>
+
+                        <!-- Optimized SQL Display -->
+                        <div class="soft-card p-6 mb-3" id="optimizedSqlCard" data-role="optimizedSqlCard">
+                            <div class="flex items-center justify-between mb-4 card-header-row">
+                                <div class="flex items-center gap-2 card-header-actions">
+                                    <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">description</span>
+                                    <span class="font-bold" style="color: var(--text-primary);">优化后的 SQL</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button class="soft-button-secondary py-2 px-3 text-xs flex items-center gap-1" data-copy-field="optimizedSql" data-copy-label="优化后的 SQL">
+                                        <span class="material-symbols-outlined text-sm">content_copy</span>
+                                        <span class="font-bold">复制</span>
+                                    </button>
+                                    <span class="soft-badge primary">optimized.sql</span>
+                                </div>
+                            </div>
+                            <div class="soft-code-block p-4">
+                                <pre class="text-sm code-font whitespace-pre-wrap overflow-x-auto"><code id="optimizedSql" data-role="optimizedSql" data-field="optimizedSql" class="optimized-sql-code" style="color: #e2e8f0;"></code></pre>
+                            </div>
+                        </div>
+
+                        <!-- Performance Metrics -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3 result-metrics-grid">
+                            <div class="soft-card p-5 result-metric-card" id="timeComparisonCard" data-role="timeComparisonCard">
+                                <div class="text-xs font-bold mb-2" data-role="timeComparisonTitle" style="color: var(--text-tertiary);">执行时间</div>
+                                <div class="text-xl font-extrabold" style="color: var(--text-primary);" id="timeComparison" data-role="timeComparison" data-field="timeComparison">-</div>
+                            </div>
+                            <div class="soft-card p-5 result-metric-card" data-role="rowsComparisonCard">
+                                <div class="text-xs font-bold mb-2" data-role="rowsComparisonTitle" style="color: var(--text-tertiary);">扫描行数</div>
+                                <div class="text-xl font-extrabold" style="color: var(--text-primary);" id="rowsComparison" data-role="rowsComparison" data-field="rowsComparison">-</div>
+                            </div>
+                            <div class="soft-card p-5 hidden result-metric-card" id="improvementCard" data-role="improvementCard">
+                                <div class="text-xs font-bold mb-2" style="color: var(--text-tertiary);">性能提升</div>
+                                <div class="text-xl font-extrabold" id="improvementValue" data-role="improvementValue" data-field="improvementValue">-</div>
+                            </div>
+                        </div>
+
+                        <!-- 执行计划摘要已隐藏（已有执行计划对比功能） -->
+                        <!--
+                        <div class="soft-card p-6 mb-3" id="explainCard" data-role="explainCard" style="display: none;">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="soft-icon-container w-10 h-10">
+                                    <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">query_stats</span>
+                                </div>
+                                <span class="font-bold text-lg" style="color: var(--text-primary);">执行计划摘要</span>
+                            </div>
+                            <div class="overflow-x-auto schema-table-wrapper">
+                                <table class="w-full text-sm">
+                                    <tbody id="explainTableBody" data-role="explainTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        -->
+
+                        <!-- Index Operations Card (Featured) -->
+                        <div class="soft-card p-6 mb-3" id="indexOperationCard" data-role="indexOperationCard" style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%); border: 2px solid rgba(102, 126, 234, 0.2);">
+                            <div class="flex items-center justify-between mb-5 card-header-row">
+                                <div class="flex items-center gap-3">
+                                    <div class="soft-icon-container w-10 h-10">
+                                        <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">vpn_key</span>
+                                    </div>
+                                    <span class="font-bold text-lg" style="color: var(--text-primary);">索引操作</span>
+                                </div>
+                                <div class="flex items-center gap-2 card-header-actions">
+                                    <button class="soft-button-secondary py-2 px-3 text-xs flex items-center gap-1" data-copy-field="indexDDL" data-copy-label="索引 SQL">
+                                        <span class="material-symbols-outlined text-sm">content_copy</span>
+                                        <span class="font-bold">复制</span>
+                                    </button>
+                                    <span class="soft-badge primary" id="indexOperationBadge" data-role="indexOperationBadge">索引优化</span>
+                                </div>
+                            </div>
+                            <div id="indexOperationContent" data-role="indexOperationContent" data-field="indexOperation" class="space-y-4"></div>
+                        </div>
+
+                        <!-- Collapsible Sections -->
+                        <div class="space-y-4" id="collapsibleSections">
+                            <!-- Problems Card -->
+                            <div class="collapsible-section soft-card" id="problemsCard" data-role="problemsCard" style="display: none;">
+                                <div class="collapsible-header p-5 flex items-center justify-between" onclick="toggleCollapsible(this)">
+                                    <div class="flex items-center gap-3">
+                                        <div class="soft-icon-container w-10 h-10">
+                                            <span class="material-symbols-outlined" style="color: var(--warning-color);">warning</span>
+                                        </div>
+                                        <span class="font-bold" style="color: var(--text-primary);">发现的问题</span>
+                                    </div>
+                                    <span class="material-symbols-outlined collapsible-icon" style="color: var(--text-tertiary);">expand_more</span>
+                                </div>
+                                <div class="collapsible-content">
+                                    <div class="px-5 pb-5 space-y-3" id="problemsList" data-role="problemsList"></div>
+                                </div>
+                            </div>
+
+                            <!-- Suggestions Card -->
+                            <div class="collapsible-section soft-card" id="suggestionsCard" data-role="suggestionsCard" style="display: none;">
+                                <div class="collapsible-header p-5 flex items-center justify-between" onclick="toggleCollapsible(this)">
+                                    <div class="flex items-center gap-3">
+                                        <div class="soft-icon-container w-10 h-10">
+                                            <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">lightbulb</span>
+                                        </div>
+                                        <span class="font-bold" style="color: var(--text-primary);">优化建议</span>
+                                    </div>
+                                    <span class="material-symbols-outlined collapsible-icon" style="color: var(--text-tertiary);">expand_more</span>
+                                </div>
+                                <div class="collapsible-content">
+                                    <div class="px-5 pb-5 space-y-3" id="suggestionsList" data-role="suggestionsList"></div>
+                                </div>
+                            </div>
+
+                            <!-- Explanations Card -->
+                            <div class="collapsible-section soft-card" id="explanationsCard" data-role="explanationsCard" style="display: none;">
+                                <div class="collapsible-header p-5 flex items-center justify-between" onclick="toggleCollapsible(this)">
+                                    <div class="flex items-center gap-3">
+                                        <div class="soft-icon-container w-10 h-10">
+                                            <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">info</span>
+                                        </div>
+                                        <span class="font-bold" style="color: var(--text-primary);">优化说明</span>
+                                    </div>
+                                    <span class="material-symbols-outlined collapsible-icon" style="color: var(--text-tertiary);">expand_more</span>
+                                </div>
+                                <div class="collapsible-content">
+                                    <div class="px-5 pb-5 space-y-3" id="explanationsList" data-role="explanationsList"></div>
+                                </div>
+                            </div>
+
+                            <!-- Timeline Card -->
+                            <div class="collapsible-section soft-card" id="timelineCard" data-role="timelineCard" style="display: none;">
+                                <div class="collapsible-header p-5 flex items-center justify-between" onclick="toggleCollapsible(this)">
+                                    <div class="flex items-center gap-3">
+                                        <div class="soft-icon-container w-10 h-10">
+                                            <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">schedule</span>
+                                        </div>
+                                        <span class="font-bold" style="color: var(--text-primary);">Agent 执行过程</span>
+                                    </div>
+                                    <div class="flex items-center gap-3 timeline-toolbar">
+                                        <span class="soft-badge primary" id="totalAgentTime" data-role="totalAgentTime">总计: -</span>
+                                        <select id="timelineSourceFilter" data-role="timelineSourceFilter" class="soft-input px-2 py-1 text-xs" onchange="refreshCurrentTimeline(this.closest('.results'))">
+                                            <option value="all">全部来源</option>
+                                            <option value="agent">仅 Agent</option>
+                                            <option value="system">仅 System</option>
+                                            <option value="tool">仅 Tool</option>
+                                        </select>
+                                        <span class="material-symbols-outlined collapsible-icon" style="color: var(--text-tertiary);">expand_more</span>
+                                    </div>
+                                </div>
+                                <div class="collapsible-content">
+                                    <div class="px-5 pb-5 space-y-3" id="timelineContainer" data-role="timelineContainer"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Page -->
+                <div id="historyPage" style="display: none;">
+                    <section class="soft-card p-4 mb-3">
+                        <div class="flex items-start gap-4">
+                            <div class="soft-icon-container w-12 h-12 flex-shrink-0">
+                                <span class="material-symbols-outlined text-2xl" style="color: var(--primary-gradient-start);">history</span>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold mb-2" style="color: var(--text-primary);">SQL 分析历史记录</h2>
+                                <p class="text-sm leading-relaxed" style="color: var(--text-secondary);">
+                                    查看历史 SQL 分析记录，复用之前的优化结果。
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- History List Section -->
+                    <section id="historyListSection">
+                        <div class="soft-card p-6 mb-3">
+                            <div class="flex items-center justify-between mb-4 history-toolbar">
+                                <h3 class="font-bold text-lg" style="color: var(--text-primary);">历史记录</h3>
+                                <button id="refreshHistoryBtn" class="soft-button-secondary py-2 px-4 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-sm">refresh</span>
+                                    <span class="font-bold text-sm">刷新列表</span>
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <input id="historyFilterFrom" type="date" class="soft-input p-2.5 text-sm" />
+                                <input id="historyFilterTo" type="date" class="soft-input p-2.5 text-sm" />
+                            </div>
+                        </div>
+                        <div id="historyList" class="space-y-4">
+                            <div class="soft-card-inset p-6 text-center">
+                                <span class="material-symbols-outlined soft-loading text-4xl mb-2" style="color: var(--primary-gradient-start);">hourglass_empty</span>
+                                <p class="text-sm" style="color: var(--text-secondary);">加载中...</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- History Detail Section -->
+                    <section id="historyDetailSection" style="display: none;">
+                        <div class="soft-card p-6 mb-3">
+                            <button id="backToHistoryBtn" class="soft-button-secondary py-2 px-4 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm">arrow_back</span>
+                                <span class="font-bold text-sm">返回历史列表</span>
+                            </button>
+                        </div>
+
+                        <div id="historyResults" class="results">
+                            <!-- History detail content will be dynamically loaded -->
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Tables Page -->
+                <div id="tablesPage" class="w-full" style="display: none;">
+                    <section class="soft-card p-4 mb-3">
+                        <div class="flex items-start gap-4">
+                            <div class="soft-icon-container w-12 h-12 flex-shrink-0">
+                                <span class="material-symbols-outlined text-2xl" style="color: var(--primary-gradient-start);">storage</span>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold mb-2" style="color: var(--text-primary);">数据库表结构查看</h2>
+                                <p class="text-sm leading-relaxed" style="color: var(--text-secondary);">
+                                    <span id="tablesFeatureHint">当前为只读演示模式，仅展示表结构、字段和索引信息。</span>
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+
+                    <!-- Load Tables Button -->
+                    <section class="soft-card p-4 mb-3">
+                        <button id="loadTablesBtn" class="soft-button w-full py-2.5 px-4 flex items-center justify-center gap-2 text-sm">
+                            <span class="material-symbols-outlined text-lg">table_view</span>
+                            <span>加载表列表</span>
+                        </button>
+                    </section>
+
+                    <!-- Tables List -->
+                    <section id="tablesListSection" style="display: none;">
+                        <div class="soft-card p-4 mb-3">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">table_rows</span>
+                                <span class="font-bold" style="color: var(--text-primary);">表列表</span>
+                            </div>
+                        </div>
+                        <div id="tablesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                    </section>
+
+                    <!-- Table Detail Section -->
+                    <section id="tableDetailSection" style="display: none;">
+                        <div class="soft-card p-6 mb-3">
+                            <button id="backToTablesBtn" class="soft-button-secondary py-2 px-4 flex items-center gap-2 mb-4">
+                                <span class="material-symbols-outlined text-sm">arrow_back</span>
+                                <span class="font-bold text-sm">返回表列表</span>
+                            </button>
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">dataset</span>
+                                <span class="font-bold text-lg" style="color: var(--text-primary);" id="detailTableName">表详情</span>
+                            </div>
+                        </div>
+
+                        <!-- Columns Table -->
+                        <div class="soft-card p-6 mb-3">
+                            <h4 class="font-bold mb-4" style="color: var(--text-primary);">列信息</h4>
+                            <div class="overflow-x-auto schema-table-wrapper">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="border-b" style="border-color: var(--border-color);">
+                                            <th class="text-left py-3 px-4 font-bold" style="color: var(--text-tertiary);">列名</th>
+                                            <th class="text-left py-3 px-4 font-bold" style="color: var(--text-tertiary);">类型</th>
+                                            <th class="text-left py-3 px-4 font-bold" style="color: var(--text-tertiary);">可空</th>
+                                            <th class="text-left py-3 px-4 font-bold" style="color: var(--text-tertiary);">键</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="columnsTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Indexes Table -->
+                        <div class="soft-card p-6">
+                            <h4 class="font-bold mb-4" style="color: var(--text-primary);">索引</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="border-b" style="border-color: var(--border-color);">
+                                            <th class="text-left py-3 px-4 font-bold" style="color: var(--text-tertiary);">索引名</th>
+                                            <th class="text-left py-3 px-4 font-bold" style="color: var(--text-tertiary);">列</th>
+                                            <th class="text-left py-3 px-4 font-bold" style="color: var(--text-tertiary);">类型</th>
+                                            <th class="text-left py-3 px-4 font-bold" style="color: var(--text-tertiary);">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="indexesTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Workload Page -->
+                <div id="workloadPage" style="display: none;">
+                    <section class="soft-card p-4 mb-3">
+                        <div class="flex items-start gap-4">
+                            <div class="soft-icon-container w-12 h-12 flex-shrink-0">
+                                <span class="material-symbols-outlined text-2xl" style="color: var(--primary-gradient-start);">schema</span>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold mb-2" style="color: var(--text-primary);">索引实验（测试阶段）</h2>
+                                <p class="text-sm leading-relaxed" style="color: var(--text-secondary);">
+                                    这是面向“单表多索引设计”方向的实验入口。当前用于测试多条 SQL 的索引集合推荐能力，不代表最终产品形态。
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- SQL Input -->
+                    <section class="soft-card p-6 mb-3">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined" style="color: var(--primary-gradient-start);">code</span>
+                                <span class="font-bold" style="color: var(--text-primary);">输入多条 SQL（实验）</span>
+                            </div>
+                            <span class="soft-badge" style="color: var(--text-tertiary);" id="workloadSqlCount">0 / 10</span>
+                        </div>
+
+                        <div class="soft-card-inset p-4 mb-4">
+                            <textarea id="workloadSqlInput" class="w-full h-48 bg-transparent border-none focus:ring-0 code-font text-sm resize-none" style="color: var(--text-primary);" spellcheck="false" placeholder="请逐行输入 SELECT 查询语句，每行一条...
+
+示例:
+SELECT * FROM user WHERE city = '北京';
+SELECT * FROM user WHERE city = '上海' AND level > 5;
+SELECT * FROM user WHERE city = '北京' AND level > 3;" maxlength="5000"></textarea>
+                        </div>
+
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm font-medium" style="color: var(--text-secondary);">最大索引数:</label>
+                                <input type="number" id="maxIndexes" value="5" min="1" max="10" class="w-20 px-3 py-2 soft-card-inset border-none focus:ring-0 text-sm" style="color: var(--text-primary);">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button id="workloadBtn" class="soft-button py-3 px-6 flex items-center gap-2">
+                                <span>开始实验</span>
+                                <span class="material-symbols-outlined">auto_fix_high</span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Workload Loading -->
+                    <div class="soft-card p-12 text-center hidden" id="workloadLoading">
+                        <div class="inline-block">
+                            <div class="w-16 h-16 rounded-full mx-auto mb-4 soft-loading" style="background: linear-gradient(145deg, var(--primary-gradient-start), var(--primary-gradient-end));"></div>
+                            <p class="font-medium" style="color: var(--text-secondary);">正在执行索引实验，AI 正在生成测试阶段建议...</p>
+                        </div>
+                    </div>
+
+                    <!-- Workload Results -->
+                    <div class="results" id="workloadResults">
+                        <!-- Coverage Stats -->
+                        <div class="soft-card p-6 mb-3">
+                            <h3 class="font-bold text-lg mb-4" style="color: var(--text-primary);">实验结果</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div class="soft-card-inset p-4 text-center">
+                                    <div class="text-3xl font-extrabold mb-2" style="color: var(--primary-gradient-start);" id="totalIndexesCount">0</div>
+                                    <div class="text-sm font-medium" style="color: var(--text-secondary);">建议索引数</div>
+                                </div>
+                                <div class="soft-card-inset p-4 text-center">
+                                    <div class="text-3xl font-extrabold mb-2" style="color: var(--success-color);" id="coveredSqlCount">0</div>
+                                    <div class="text-sm font-medium" style="color: var(--text-secondary);">覆盖 SQL 数</div>
+                                </div>
+                                <div class="soft-card-inset p-4 text-center">
+                                    <div class="text-3xl font-extrabold mb-2" style="color: var(--warning-color);" id="coverageRate">0%</div>
+                                    <div class="text-sm font-medium" style="color: var(--text-secondary);">覆盖率</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recommended Indexes -->
+                        <div class="soft-card p-6 mb-3">
+                            <h3 class="font-bold text-lg mb-4" style="color: var(--text-primary);">实验性索引建议</h3>
+                            <div id="recommendedIndexesContainer"></div>
+                        </div>
+
+                        <!-- Analysis Details -->
+                        <div class="soft-card p-6">
+                            <h3 class="font-bold text-lg mb-4" style="color: var(--text-primary);">实验说明</h3>
+                            <div class="soft-card-inset p-5">
+                                <div class="text-sm" style="color: var(--text-primary);" id="workloadDetails"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="w-full px-3 py-4 mt-4">
+        <div class="soft-card p-4">
+            <div class="flex items-center justify-center gap-6 text-xs font-medium app-footer-meta" style="color: var(--text-tertiary);">
+                <div>SQL Agent v1.0 | Open Source Demo</div>
+                <div>•</div>
+                <div>Optimization Analysis</div>
+                <div>•</div>
+                <div>Index Design Is Still Experimental</div>
+            </div>
+        </div>
+    </footer>
+    <script defer src="js/i18n.js"></script>
+    <script defer src="js/state/store.js"></script>
+    <script defer src="js/components/toast.js"></script>
+    <script defer src="js/components/tools.js"></script>
+    <script defer src="js/api/client.js"></script>
+    <script defer src="js/services/samples.js"></script>
+    <script defer src="js/services/stream.js"></script>
+    <script defer src="js/pages/analyze.js"></script>
+    <script defer src="js/components/plan-workbench.js"></script>
+    <script defer src="js/components/explain.js"></script>
+    <script defer src="js/components/timeline.js"></script>
+    <script defer src="js/components/results.js"></script>
+    <script defer src="js/pages/history.js"></script>
+    <script defer src="js/pages/tables.js"></script>
+    <script defer src="js/pages/workload.js"></script>
+    <script defer src="js/app.js"></script>
+    <!-- CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/sql/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
+    <!-- SQL Formatter -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql-formatter/13.0.1/sql-formatter.min.js"></script>
+</body>
+</html>

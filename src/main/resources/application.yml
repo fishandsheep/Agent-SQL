@@ -1,0 +1,49 @@
+server:
+  port: 8899
+  servlet:
+    context-path: /SQLAgent
+
+spring:
+  application:
+    name: sql-agent
+
+  datasource:
+    default:
+      url: ${SQL_AGENT_DB_URL:jdbc:mysql://localhost:3306/sql_agent_demo?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+      username: ${SQL_AGENT_DB_USERNAME:}
+      password: ${SQL_AGENT_DB_PASSWORD:}
+      driver-class-name: ${SQL_AGENT_DB_DRIVER:com.mysql.cj.jdbc.Driver}
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+
+agent:
+  optimization:
+    max-iterations: 3
+    enable-loop-prevention: true
+
+sql-agent:
+  demo:
+    read-only: ${SQL_AGENT_DEMO_READ_ONLY:true}
+  features:
+    mutation-endpoints-enabled: ${SQL_AGENT_MUTATION_ENABLED:false}
+
+openai:
+  api:
+    url: ${SQL_AGENT_MODEL_BASE_URL:}
+    key: ${SQL_AGENT_MODEL_API_KEY:}
+    model: ${SQL_AGENT_MODEL:}
+    available-models: ${SQL_AGENT_AVAILABLE_MODELS:}
+    timeout: ${SQL_AGENT_MODEL_TIMEOUT:60}
+    temperature: ${SQL_AGENT_MODEL_TEMPERATURE:0.7}
+    max-tokens: ${SQL_AGENT_MODEL_MAX_TOKENS:2000}
+    request-logging-enabled: ${SQL_AGENT_MODEL_LOG_REQUESTS:false}
+    response-logging-enabled: ${SQL_AGENT_MODEL_LOG_RESPONSES:false}
+logging:
+  level:
+    com.sqlagent: INFO
+    com.zaxxer.hikari: INFO
+    dev.langchain4j: INFO
+    root: WARN

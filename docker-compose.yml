@@ -1,0 +1,44 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: sql-agent-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: sql_agent_demo
+      MYSQL_ROOT_PASSWORD: ${SQL_AGENT_DB_PASSWORD:-}
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    command:
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${SQL_AGENT_DB_PASSWORD:-change_me}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sql-agent-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SQL_AGENT_DB_URL: ${SQL_AGENT_DB_URL:-jdbc:mysql://mysql:3306/sql_agent_demo?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+      SQL_AGENT_DB_USERNAME: ${SQL_AGENT_DB_USERNAME:-}
+      SQL_AGENT_DB_PASSWORD: ${SQL_AGENT_DB_PASSWORD:-}
+      SQL_AGENT_DEMO_READ_ONLY: ${SQL_AGENT_DEMO_READ_ONLY:-true}
+      SQL_AGENT_MUTATION_ENABLED: ${SQL_AGENT_MUTATION_ENABLED:-false}
+    ports:
+      - "8899:8899"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql-data:

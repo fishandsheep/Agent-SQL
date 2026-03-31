@@ -1,0 +1,36 @@
+#loading > div {
+            display: block;
+            width: min(100%, 1400px);
+            margin: 0 auto;
+        }
+
+        #streamProgressPanel {
+            width: 100%;
+            min-height: 360px;
+            max-height: 70vh !important;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        @media (min-width: 1440px) {
+            #streamProgressPanel {
+                min-height: 460px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            #loading,
+            #workloadLoading {
+                padding: 1.5rem;
+            }
+
+            #loading > div {
+                width: 100%;
+            }
+
+            #streamProgressPanel {
+                min-height: 220px;
+                max-height: 50vh !important;
+            }
+        }

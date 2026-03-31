@@ -1,0 +1,198 @@
+:root {
+            /* Soft UI Color Palette */
+            --bg-gradient-start: #f5f7fa;
+            --bg-gradient-end: #e8ecf1;
+            --card-bg: #ffffff;
+            --card-shadow-light: rgba(255, 255, 255, 0.9);
+            --card-shadow-dark: rgba(163, 177, 198, 0.6);
+            --primary-gradient-start: #667eea;
+            --primary-gradient-end: #764ba2;
+            --primary-light: rgba(102, 126, 234, 0.15);
+            --primary-shadow: rgba(102, 126, 234, 0.4);
+            --success-color: #48bb78;
+            --success-light: rgba(72, 187, 120, 0.15);
+            --error-color: #f56565;
+            --error-light: rgba(245, 101, 101, 0.15);
+            --warning-color: #ed8936;
+            --warning-light: rgba(237, 137, 54, 0.15);
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --text-tertiary: #a0aec0;
+            --border-color: rgba(163, 177, 198, 0.3);
+        }
+
+        * {
+            font-family: 'Nunito', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        .main-content {
+            flex: 1;
+        }
+
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Loading Animation */
+        @keyframes soft-pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(0.98);
+            }
+        }
+
+        .soft-loading {
+            animation: soft-pulse 2s ease-in-out infinite;
+        }
+
+        /* Code Block */
+        .soft-code-block {
+            background: linear-gradient(145deg, #2d3748, #1a202c);
+            border-radius: 16px;
+            box-shadow:
+                inset 4px 4px 8px rgba(0,0,0,0.4),
+                inset -4px -4px 8px rgba(255,255,255,0.05);
+            color: #e2e8f0;
+        }
+
+        /* Material Icons */
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+
+        /* Smooth Transitions */
+        .smooth-transition {
+            transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Hide Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: linear-gradient(145deg, #f5f7fa, #e8ecf1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(145deg, #cbd5e0, #a0aec0);
+            border-radius: 10px;
+            box-shadow:
+                inset 2px 2px 4px rgba(0,0,0,0.2),
+                inset -1px -1px 2px rgba(255,255,255,0.5);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(145deg, #b8c5d6, #94a3b8);
+        }
+
+        /* CodeMirror Custom Styles */
+        .CodeMirror {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            border-radius: 12px;
+            background: linear-gradient(145deg, #ffffff, #f8fafc);
+            color: var(--text-primary);
+            padding: 8px;
+        }
+
+        .CodeMirror-gutters {
+            border-right: 1px solid var(--border-color);
+            background: linear-gradient(145deg, #f8fafc, #edf2f7);
+        }
+
+        .CodeMirror-linenumber {
+            color: var(--text-tertiary);
+            padding: 0 6px;
+        }
+
+        .CodeMirror-cursor {
+            border-left: 2px solid var(--primary-gradient-start);
+        }
+
+        .CodeMirror-selected {
+            background: var(--primary-light);
+        }
+
+        .CodeMirror-focused .CodeMirror-selected {
+            background: rgba(102, 126, 234, 0.25);
+        }
+
+        /* SQL Syntax Highlighting */
+        .cm-keyword {
+            color: #d73a49;
+            font-weight: 600;
+        }
+
+        .cm-variable {
+            color: #6f42c1;
+        }
+
+        .cm-variable-2 {
+            color: #005cc5;
+        }
+
+        .cm-string {
+            color: #032f62;
+        }
+
+        .cm-number {
+            color: #005cc5;
+        }
+
+        .cm-comment {
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
+        .cm-operator {
+            color: var(--text-primary);
+        }
+
+        .cm-def {
+            color: #6f42c1;
+        }
+
+        .cm-property {
+            color: #005cc5;
+        }
+
+        .cm-atom {
+            color: #005cc5;
+        }
+
+        /* CodeMirror Scrollbar */
+        .CodeMirror-vscrollbar,
+        .CodeMirror-hscrollbar {
+            outline: none;
+        }
+
+        .CodeMirror-vscrollbar::-webkit-scrollbar,
+        .CodeMirror-hscrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .CodeMirror-vscrollbar::-webkit-scrollbar-thumb,
+        .CodeMirror-hscrollbar::-webkit-scrollbar-thumb {
+            background: linear-gradient(145deg, #cbd5e0, #a0aec0);
+            border-radius: 4px;
+        }
