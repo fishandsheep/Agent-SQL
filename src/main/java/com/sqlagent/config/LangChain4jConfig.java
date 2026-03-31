@@ -75,9 +75,26 @@ public class LangChain4jConfig {
             modelProperties.isResponseLoggingEnabled()
         );
 
+        // OpenAI-compatible SDKs reject null/empty url and key at construction time.
+        // Use placeholders so the application can start without credentials configured;
+        // actual API calls will fail at runtime with a clear auth error instead.
+        String apiKey = modelProperties.getKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("[langchain4j] API key is not configured (SQL_AGENT_MODEL_API_KEY). " +
+                     "The application will start but AI features will not work until a key is provided.");
+            apiKey = "not-configured";
+        }
+
+        String baseUrl = modelProperties.getUrl();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            log.warn("[langchain4j] Base URL is not configured (SQL_AGENT_MODEL_BASE_URL). " +
+                     "The application will start but AI features will not work until a URL is provided.");
+            baseUrl = "https://api.openai.com/v1";
+        }
+
         return OpenAiChatModel.builder()
-            .baseUrl(modelProperties.getUrl())
-            .apiKey(modelProperties.getKey())
+            .baseUrl(baseUrl)
+            .apiKey(apiKey)
             .modelName(modelName)
             .timeout(Duration.ofSeconds(modelProperties.getTimeout()))
             .temperature(modelProperties.getTemperature())

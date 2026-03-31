@@ -117,6 +117,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadToolsList();
     updateNavigationState(currentPage);
     initializeInteractiveHeaders();
+    if (typeof startTourIfFirstVisit === 'function') {
+        startTourIfFirstVisit();
+    }
 
     document.getElementById('navAnalyze').addEventListener('click', () => switchPage('analyze'));
 

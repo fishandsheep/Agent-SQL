@@ -305,7 +305,23 @@ const I18N_MESSAGES = {
         'plan.riskEmpty': '当前结果未提供额外提示。',
         'footer.demo': 'SQL Agent v1.0 | Open Source Demo',
         'footer.primary': 'Optimization Analysis First',
-        'footer.experimental': 'Index Design In Testing'
+        'footer.experimental': 'Index Design In Testing',
+        'tour.button': '使用指南',
+        'tour.next': '下一步',
+        'tour.prev': '上一步',
+        'tour.done': '完成',
+        'tour.step1.title': '优化分析入口',
+        'tour.step1.desc': '这是目前打磨最完整的主功能。点击这里进入 SQL 优化分析流程。',
+        'tour.step2.title': '可用工具',
+        'tour.step2.desc': 'Agent 在分析过程中会调用这些工具，包括执行计划分析、索引推荐、结果校验等。',
+        'tour.step3.title': '选择 AI 模型',
+        'tour.step3.desc': '可以在这里切换不同的 AI 模型，不同模型在效果和速度上有所差异。',
+        'tour.step4.title': 'SQL 样例',
+        'tour.step4.desc': '点击任意样例，可以直接将 SQL 填充到下方编辑器，方便快速体验。',
+        'tour.step5.title': '输入 SQL',
+        'tour.step5.desc': '在这里输入你想要优化的 SELECT 查询语句，支持语法高亮和格式化。',
+        'tour.step6.title': '开始分析',
+        'tour.step6.desc': '输入 SQL 后点击这里，Agent 会自动生成候选方案、执行验证并给出优化结论。'
     },
     en: {
         'meta.title': 'SQL Agent | Optimization Analysis',
@@ -613,7 +629,23 @@ const I18N_MESSAGES = {
         'plan.riskEmpty': 'No extra notes were provided for this result.',
         'footer.demo': 'SQL Agent v1.0 | Open Source Demo',
         'footer.primary': 'Optimization Analysis First',
-        'footer.experimental': 'Index Design In Testing'
+        'footer.experimental': 'Index Design In Testing',
+        'tour.button': 'Quick Tour',
+        'tour.next': 'Next',
+        'tour.prev': 'Prev',
+        'tour.done': 'Done',
+        'tour.step1.title': 'Optimization Analysis',
+        'tour.step1.desc': 'This is the main workflow. Click here to start analyzing and optimizing your SQL queries.',
+        'tour.step2.title': 'Available Tools',
+        'tour.step2.desc': 'The Agent uses these tools during analysis — execution plan inspection, index recommendations, result validation, and more.',
+        'tour.step3.title': 'Choose an AI Model',
+        'tour.step3.desc': 'Switch between different AI models here. They vary in quality and response speed.',
+        'tour.step4.title': 'SQL Samples',
+        'tour.step4.desc': 'Click any sample to fill it into the editor below — a quick way to try the tool.',
+        'tour.step5.title': 'Enter SQL',
+        'tour.step5.desc': 'Type your SELECT query here. The editor supports syntax highlighting and formatting.',
+        'tour.step6.title': 'Run Analysis',
+        'tour.step6.desc': 'Click here to start. The Agent will generate candidate plans, validate them, and return an explainable optimization result.'
     }
 };
 
@@ -623,6 +655,7 @@ const I18N_STATIC_BINDINGS = [
     { selector: 'header p.text-sm.font-medium', key: 'header.subtitle' },
     { selector: 'header .soft-badge.primary span.flex.items-center.gap-2', key: 'header.online', target: 'lastChildText' },
     { selector: '#languageToggleLabel', key: 'header.language' },
+    { selector: '#tourBtnLabel', key: 'tour.button' },
     { selector: '#navAnalyze .font-bold', key: 'nav.analyze' },
     { selector: '#navWorkload .font-bold', key: 'nav.workload' },
     { selector: '#navHistory .font-bold', key: 'nav.history' },

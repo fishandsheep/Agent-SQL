@@ -8,6 +8,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <!-- driver.js -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1/dist/driver.css"/>
     <!-- CodeMirror CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css" rel="stylesheet"/>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css" rel="stylesheet"/>
@@ -31,6 +33,10 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3 app-header-actions">
+                    <button id="tourBtn" onclick="startTour()" class="soft-button-secondary py-2 px-3 flex items-center gap-2 text-sm" data-i18n="tour.button">
+                        <span class="material-symbols-outlined text-sm">help_outline</span>
+                        <span id="tourBtnLabel">使用指南</span>
+                    </button>
                     <button id="languageToggle" onclick="toggleLanguage()" class="soft-button-secondary py-2 px-3 flex items-center gap-2 text-sm">
                         <span class="material-symbols-outlined text-sm">translate</span>
                         <span id="languageToggleLabel">English</span>
@@ -721,5 +727,9 @@ SELECT * FROM user WHERE city = '北京' AND level > 3;" maxlength="5000"></text
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
     <!-- SQL Formatter -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql-formatter/13.0.1/sql-formatter.min.js"></script>
+    <!-- driver.js -->
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1/dist/driver.js.iife.js"></script>
+    <!-- Onboarding tour -->
+    <script defer src="js/tour.js"></script>
 </body>
 </html>
