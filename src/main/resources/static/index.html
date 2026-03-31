@@ -27,7 +27,7 @@
                     </div>
                     <div>
                         <h1 class="text-2xl font-extrabold" style="color: var(--text-primary);">SQL Agent</h1>
-                        <p class="text-sm font-medium" style="color: var(--text-secondary);">我当前重点打磨优化分析，索引设计还在继续实验</p>
+                        <p class="text-sm font-medium" style="color: var(--text-secondary);">当前重点打磨优化分析，索引设计还在继续实验中</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 app-header-actions">
@@ -59,7 +59,7 @@
                         </button>
                         <button type="button" id="navWorkload" class="soft-nav-item flex items-center gap-3 w-full text-left" onclick="switchPage('workload')">
                             <span class="material-symbols-outlined">schema</span>
-                            <span class="font-bold">索引实验（测试）</span>
+                            <span class="font-bold">索引设计（测试）</span>
                         </button>
                         <button type="button" id="navHistory" class="soft-nav-item flex items-center gap-3 w-full text-left" onclick="switchPage('history')">
                             <span class="material-symbols-outlined">history</span>
@@ -93,7 +93,7 @@
                             <div>
                                 <h2 class="text-xl font-bold mb-2" style="color: var(--text-primary);">优化分析</h2>
                                 <p class="text-sm leading-relaxed" style="color: var(--text-secondary);">
-                                    这里是我目前打磨最完整的主流程。我先生成候选方案，再用系统执行、校验和评分，把优化结论和证据链一起展示出来。
+                                    这里是目前打磨最完整的主流程。先生成候选方案，再用系统执行、校验和评分，把优化结论和证据链一起展示出来。
                                 </p>
                             </div>
                         </div>
@@ -691,6 +691,10 @@ SELECT * FROM user WHERE city = '北京' AND level > 3;" maxlength="5000"></text
                 <div>Optimization Analysis</div>
                 <div>•</div>
                 <div>Index Design Is Still Experimental</div>
+                <div>•</div>
+                <div>Spring Boot, LangChain4j, OpenAI API</div>
+                <div>•</div>
+                <div>Soft UI</div>
             </div>
         </div>
     </footer>
