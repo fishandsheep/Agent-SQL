@@ -14,12 +14,7 @@ import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -681,11 +676,11 @@ public class SqlPatternAdvisor {
         String prefix = sql.substring(0, whereIndex + 7);
         String whereClause = sql.substring(whereIndex + 7).trim();
         List<String> branches = splitTopLevelOr(whereClause);
-        if (branches.size() < 2 || !areMutuallyExclusive(branches)) {
+        if (branches.size() < 2 || !canSafelyRewriteTopLevelOrToUnionAll(branches)) {
             return sql;
         }
 
-        analysis.getDiagnostics().add("检测到可以安全拆分的 OR 谓词；建议改写为 UNION ALL，使每个分支都能使用更稳定的访问路径。");
+        analysis.getDiagnostics().add("检测到可安全拆分且共享关键等值条件的 OR 谓词；可考虑改写为 UNION ALL 后再逐分支验证执行计划。");
         List<String> selects = new ArrayList<>();
         for (String branch : branches) {
             selects.add(prefix + branch.trim());
@@ -731,6 +726,30 @@ public class SqlPatternAdvisor {
             result.add(current.toString().trim());
         }
         return result;
+    }
+
+    private boolean canSafelyRewriteTopLevelOrToUnionAll(List<String> branches) {
+        return hasSharedEqualityColumns(branches) && areMutuallyExclusive(branches);
+    }
+
+    private boolean hasSharedEqualityColumns(List<String> branches) {
+        if (branches == null || branches.size() < 2) {
+            return false;
+        }
+
+        Map<String, String> sharedTerms = new LinkedHashMap<>(parseEqualityTerms(branches.get(0)));
+        if (sharedTerms.isEmpty()) {
+            return false;
+        }
+
+        for (int i = 1; i < branches.size(); i++) {
+            Map<String, String> branchTerms = parseEqualityTerms(branches.get(i));
+            sharedTerms.entrySet().removeIf(entry -> !entry.getValue().equals(branchTerms.get(entry.getKey())));
+            if (sharedTerms.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean areMutuallyExclusive(List<String> branches) {

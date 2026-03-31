@@ -1,9 +1,6 @@
 package com.sqlagent.evaluator;
 
-import com.sqlagent.model.EvaluationReport;
-import com.sqlagent.model.PlanCandidate;
-import com.sqlagent.model.PlanExecutionResult;
-import com.sqlagent.model.PlanScore;
+import com.sqlagent.model.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -25,6 +23,9 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class PlanEvaluator {
+
+    private static final Pattern EXPLAIN_ALL_PATTERN = Pattern.compile("\"type\"\\s*:\\s*\"ALL\"", Pattern.CASE_INSENSITIVE);
+    private static final double MIN_UNION_REWRITE_GAIN = 0.10d;
 
     /**
      * 评估所有方案
@@ -83,7 +84,7 @@ public class PlanEvaluator {
 
         // 4. 选择最优方案
         List<PlanScore> validScores = scores.stream()
-            .filter(score -> isValidResult(results, score.getPlanId()))
+            .filter(score -> isValidResult(candidates, results, score.getPlanId(), baseline))
             .toList();
 
         PlanScore bestScore = (validScores.isEmpty() ? scores : validScores).stream()
@@ -233,9 +234,95 @@ public class PlanEvaluator {
             .orElse(null);
     }
 
-    private boolean isValidResult(List<PlanExecutionResult> results, String planId) {
+    private boolean isValidResult(
+        List<PlanCandidate> candidates,
+        List<PlanExecutionResult> results,
+        String planId,
+        PlanExecutionResult baseline
+    ) {
         PlanExecutionResult result = findResult(results, planId);
-        return result != null && result.isValid();
+        if (result == null || !result.isValid()) {
+            return false;
+        }
+
+        PlanCandidate candidate = candidates.stream()
+            .filter(item -> item != null && planId.equals(item.getPlanId()))
+            .findFirst()
+            .orElse(null);
+
+        return !isRiskyUnionRewrite(candidate, result, baseline);
+    }
+
+    private boolean isRiskyUnionRewrite(
+        PlanCandidate candidate,
+        PlanExecutionResult result,
+        PlanExecutionResult baseline
+    ) {
+        if (candidate == null
+            || !candidate.requiresRewrite()
+            || candidate.getOptimizedSql() == null
+            || !candidate.getOptimizedSql().toLowerCase().contains("union all")
+            || result == null
+            || result.getExplain() == null) {
+            return false;
+        }
+
+        if (!hasFullScanNode(result.getExplain())) {
+            return false;
+        }
+
+        if (baseline == null || baseline.getExplain() == null) {
+            return true;
+        }
+
+        boolean explainNotBetter = !hasExplainImprovement(baseline.getExplain(), result.getExplain());
+        boolean gainTooSmall = executionGainBelowThreshold(baseline, result, MIN_UNION_REWRITE_GAIN);
+        if (explainNotBetter && gainTooSmall) {
+            log.info("[plan-evaluator] skip union-all rewrite as best plan: planId={}, reason=residual_full_scan_without_clear_gain",
+                candidate.getPlanId());
+            return true;
+        }
+        return false;
+    }
+
+    private boolean hasExplainImprovement(ExplainResult baselineExplain, ExplainResult resultExplain) {
+        if (baselineExplain == null || resultExplain == null) {
+            return false;
+        }
+
+        if (hasFullScanNode(baselineExplain) && !hasFullScanNode(resultExplain)) {
+            return true;
+        }
+
+        Long baselineRows = baselineExplain.getRows();
+        Long resultRows = resultExplain.getRows();
+        return baselineRows != null
+            && resultRows != null
+            && baselineRows > 0
+            && resultRows < baselineRows;
+    }
+
+    private boolean executionGainBelowThreshold(
+        PlanExecutionResult baseline,
+        PlanExecutionResult result,
+        double threshold
+    ) {
+        if (baseline.getExecutionTime() == null || result.getExecutionTime() == null || baseline.getExecutionTime() <= 0) {
+            return true;
+        }
+        double improvement = (double) (baseline.getExecutionTime() - result.getExecutionTime()) / baseline.getExecutionTime();
+        return improvement < threshold;
+    }
+
+    private boolean hasFullScanNode(ExplainResult explain) {
+        if (explain == null) {
+            return false;
+        }
+        if ("ALL".equalsIgnoreCase(explain.getType())) {
+            return true;
+        }
+        String additionalRows = explain.getAdditionalRows();
+        return additionalRows != null && EXPLAIN_ALL_PATTERN.matcher(additionalRows).find();
     }
 
     /**

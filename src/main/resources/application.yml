@@ -29,6 +29,9 @@ sql-agent:
     read-only: ${SQL_AGENT_DEMO_READ_ONLY:true}
   features:
     mutation-endpoints-enabled: ${SQL_AGENT_MUTATION_ENABLED:false}
+  optimization:
+    max-ai-replan-attempts: ${SQL_AGENT_OPTIMIZATION_MAX_AI_REPLAN_ATTEMPTS:1}
+    min-acceptable-total-score: ${SQL_AGENT_OPTIMIZATION_MIN_ACCEPTABLE_TOTAL_SCORE:35.0}
 
 openai:
   api:

@@ -14,11 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,6 +38,16 @@ public class PlanGenerator {
         String model,
         int requestedMaxPlans
     ) {
+        return generatePlans(originalSql, sessionId, model, requestedMaxPlans, null);
+    }
+
+    public List<PlanCandidate> generatePlans(
+        String originalSql,
+        String sessionId,
+        String model,
+        int requestedMaxPlans,
+        String retryGuidance
+    ) {
         toolGateway.activateSession(sessionId);
         int maxPlans = Math.max(1, Math.min(requestedMaxPlans, 5));
 
@@ -63,7 +69,7 @@ public class PlanGenerator {
         String agentResponse;
         long generationStart = System.currentTimeMillis();
         try {
-            agentResponse = agent.generateMultiPlan(buildUserMessage(originalSql, maxPlans));
+            agentResponse = agent.generateMultiPlan(buildUserMessage(originalSql, maxPlans, retryGuidance));
         } catch (NullPointerException e) {
             log.error("[PlanGenerator] model response invalid", e);
             throw new RuntimeException("AI 返回了无效响应，请检查模型配置", e);
@@ -100,9 +106,13 @@ public class PlanGenerator {
         return candidates;
     }
 
-    private String buildUserMessage(String sql, int maxPlans) {
+    private String buildUserMessage(String sql, int maxPlans, String retryGuidance) {
+        String retrySection = (retryGuidance == null || retryGuidance.isBlank())
+            ? ""
+            : "\n补充要求（这是唯一一次补充生成）：" + "\n" + retryGuidance.trim() + "\n";
         return String.format("""
             请为下面这条 SQL 生成 1-%d 个高质量优化方案：
+            %s
             %s
 
             当前执行方式：
@@ -131,7 +141,7 @@ public class PlanGenerator {
             - 如果基线 EXPLAIN 已命中有效索引，且没有明确性能瓶颈，不要输出“确认索引存在”或重复建同类索引作为优化方案。
             - 如果判断结果是“当前 SQL 基本无需优化”，最多只保留 1 个可选的 SQL 规范化建议，不要为了凑数量生成多个方案。
             - 必须遵守 MySQL 语法，不要输出 INCLUDE 之类 MySQL 不支持的索引语法。
-            """, maxPlans, sql.trim(), maxPlans);
+            """, maxPlans, sql.trim(), retrySection, maxPlans);
     }
 
     @SuppressWarnings("unchecked")

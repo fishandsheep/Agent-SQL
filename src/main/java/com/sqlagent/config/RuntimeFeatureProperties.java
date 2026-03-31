@@ -11,6 +11,7 @@ public class RuntimeFeatureProperties {
 
     private final Demo demo = new Demo();
     private final Features features = new Features();
+    private final Optimization optimization = new Optimization();
 
     @Data
     public static class Demo {
@@ -20,5 +21,11 @@ public class RuntimeFeatureProperties {
     @Data
     public static class Features {
         private boolean mutationEndpointsEnabled = false;
+    }
+
+    @Data
+    public static class Optimization {
+        private int maxAiReplanAttempts = 1;
+        private double minAcceptableTotalScore = 35.0d;
     }
 }

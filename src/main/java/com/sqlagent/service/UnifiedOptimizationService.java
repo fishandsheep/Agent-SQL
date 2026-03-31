@@ -1,20 +1,13 @@
 package com.sqlagent.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sqlagent.config.RuntimeFeatureProperties;
 import com.sqlagent.engine.PlanExecutionEngine;
 import com.sqlagent.evaluator.PlanDiversityChecker;
 import com.sqlagent.evaluator.PlanEvaluator;
-import com.sqlagent.generator.PlanGenerator;
 import com.sqlagent.gateway.ToolGateway;
-import com.sqlagent.model.AgentExecutionStep;
-import com.sqlagent.model.EvaluationReport;
-import com.sqlagent.model.ExplainResult;
-import com.sqlagent.model.MultiPlanRequest;
-import com.sqlagent.model.MultiPlanResponse;
-import com.sqlagent.model.OptimizationPlan;
-import com.sqlagent.model.PlanCandidate;
-import com.sqlagent.model.PlanExecutionResult;
-import com.sqlagent.model.ToolCallLog;
+import com.sqlagent.generator.PlanGenerator;
+import com.sqlagent.model.*;
 import com.sqlagent.tools.DDLTool;
 import com.sqlagent.tools.ExplainTool;
 import com.sqlagent.tools.SqlPatternAdvisor;
@@ -22,10 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -44,6 +34,7 @@ public class UnifiedOptimizationService {
     private final DDLTool ddlTool;
     private final SqlPatternAdvisor sqlPatternAdvisor;
     private final ObjectMapper objectMapper;
+    private final RuntimeFeatureProperties runtimeFeatureProperties;
 
     public MultiPlanResponse optimize(MultiPlanRequest request) {
         return optimize(request, UUID.randomUUID().toString().substring(0, 8));
@@ -72,14 +63,8 @@ public class UnifiedOptimizationService {
                 return fastPathResponse;
             }
 
-            List<PlanCandidate> candidates = planGenerator.generatePlans(
-                request.getSql(),
-                sessionId,
-                request.getModel(),
-                request.getMaxPlans()
-            );
-
-            if (candidates.isEmpty()) {
+            OptimizationRound round = runOptimizationRound(request, sessionId, null);
+            if (round.candidates().isEmpty()) {
                 executionTraceService.recordPhase(
                     sessionId,
                     "plan_generation",
@@ -94,55 +79,44 @@ public class UnifiedOptimizationService {
                 return responseAssembler.buildEmptyResponse("Agent 未生成任何优化方案");
             }
 
-            boolean diverse = candidates.size() <= 1 || diversityChecker.isDiverse(candidates);
-            executionTraceService.recordPhase(
-                sessionId,
-                "diversity_check",
-                "检查候选方案多样性",
-                diverse ? "SUCCESS" : "FAILED",
-                diverse ? "候选方案差异度通过" : "候选方案差异度不足",
-                "inferred",
-                "candidateCount=" + candidates.size(),
-                diverse ? "继续执行验证" : "建议补充不同策略的候选方案",
-                0L
-            );
-            if (!diverse) {
-                log.warn("[UnifiedOptimizationService] candidate plans are not diverse enough");
+            int replanAttempts = 0;
+            while (replanAttempts < getMaxAiReplanAttempts() && shouldRetryWithAdditionalAi(round.report())) {
+                replanAttempts++;
+                String retryGuidance = buildRetryGuidance(request.getSql(), round);
+                executionTraceService.recordPhase(
+                    sessionId,
+                    "plan_regeneration",
+                    "补充生成候选方案",
+                    "RUNNING",
+                    "首轮最优方案分数未达标，系统请求 AI 补充不同思路的方案",
+                    "agent",
+                    "attempt=" + replanAttempts,
+                    truncate(retryGuidance, 180),
+                    0L
+                );
+                round = runOptimizationRound(request, sessionId, retryGuidance);
+                executionTraceService.recordPhase(
+                    sessionId,
+                    "plan_regeneration",
+                    "补充生成候选方案",
+                    "SUCCESS",
+                    "AI 已返回补充候选方案",
+                    "agent",
+                    "attempt=" + replanAttempts,
+                    "candidateCount=" + round.candidates().size(),
+                    0L
+                );
             }
 
-            List<PlanExecutionResult> results = executionEngine.executePlans(
-                request.getSql(),
-                candidates,
+            List<ToolCallLog> toolLogs = toolGateway.getSessionLogs(sessionId);
+            MultiPlanResponse response = responseAssembler.buildResponse(
+                request,
+                round.candidates(),
+                round.results(),
+                round.report(),
+                toolLogs,
                 sessionId
             );
-
-            executionTraceService.recordPhase(
-                sessionId,
-                "evaluation",
-                "评估并选择最优方案",
-                "RUNNING",
-                "系统正在对候选方案打分并选择最优方案",
-                "system",
-                "candidateCount=" + candidates.size(),
-                "等待评分结果",
-                0L
-            );
-            EvaluationReport report = planEvaluator.evaluate(candidates, results);
-            executionTraceService.recordPhase(
-                sessionId,
-                "evaluation",
-                "评估并选择最优方案",
-                "SUCCESS",
-                "最优方案已确定",
-                "system",
-                "candidateCount=" + candidates.size(),
-                "bestPlanId=" + report.getBestPlanId(),
-                0L
-            );
-            executionTraceService.recordStep(sessionId, responseAssembler.buildSelectionStep(report));
-
-            List<ToolCallLog> toolLogs = toolGateway.getSessionLogs(sessionId);
-            MultiPlanResponse response = responseAssembler.buildResponse(request, candidates, results, report, toolLogs, sessionId);
             historyService.saveHistory(response);
             return response;
         } catch (Exception e) {
@@ -171,6 +145,169 @@ public class UnifiedOptimizationService {
         }
         return value.length() > maxLength ? value.substring(0, maxLength) + "..." : value;
     }
+
+    private OptimizationRound runOptimizationRound(MultiPlanRequest request, String sessionId, String retryGuidance) {
+        List<PlanCandidate> candidates = planGenerator.generatePlans(
+            request.getSql(),
+            sessionId,
+            request.getModel(),
+            request.getMaxPlans(),
+            retryGuidance
+        );
+
+        if (candidates.isEmpty()) {
+            return new OptimizationRound(List.of(), List.of(), EvaluationReport.builder().build());
+        }
+
+        boolean diverse = candidates.size() <= 1 || diversityChecker.isDiverse(candidates);
+        executionTraceService.recordPhase(
+            sessionId,
+            "diversity_check",
+            "检查候选方案多样性",
+            diverse ? "SUCCESS" : "FAILED",
+            diverse ? "候选方案差异度通过" : "候选方案差异度不足",
+            "inferred",
+            "candidateCount=" + candidates.size(),
+            diverse ? "继续执行验证" : "建议补充不同策略的候选方案",
+            0L
+        );
+        if (!diverse) {
+            log.warn("[UnifiedOptimizationService] candidate plans are not diverse enough");
+        }
+
+        List<PlanExecutionResult> results = executionEngine.executePlans(request.getSql(), candidates, sessionId);
+
+        executionTraceService.recordPhase(
+            sessionId,
+            "evaluation",
+            "评估并选择最优方案",
+            "RUNNING",
+            "系统正在对候选方案打分并选择最优方案",
+            "system",
+            "candidateCount=" + candidates.size(),
+            "等待评分结果",
+            0L
+        );
+        EvaluationReport report = planEvaluator.evaluate(candidates, results);
+        executionTraceService.recordPhase(
+            sessionId,
+            "evaluation",
+            "评估并选择最优方案",
+            "SUCCESS",
+            "最优方案已确定",
+            "system",
+            "candidateCount=" + candidates.size(),
+            "bestPlanId=" + report.getBestPlanId(),
+            0L
+        );
+        executionTraceService.recordStep(sessionId, responseAssembler.buildSelectionStep(report));
+        return new OptimizationRound(candidates, results, report);
+    }
+
+    private boolean shouldRetryWithAdditionalAi(EvaluationReport report) {
+        if (report == null) {
+            return true;
+        }
+        PlanScore bestScore = findBestScore(report);
+        return bestScore == null || bestScore.getTotalScore() < getMinAcceptableTotalScore();
+    }
+
+    private int getMaxAiReplanAttempts() {
+        RuntimeFeatureProperties.Optimization optimization = runtimeFeatureProperties != null
+            ? runtimeFeatureProperties.getOptimization()
+            : null;
+        if (optimization == null) {
+            return 1;
+        }
+        return Math.max(0, optimization.getMaxAiReplanAttempts());
+    }
+
+    private double getMinAcceptableTotalScore() {
+        RuntimeFeatureProperties.Optimization optimization = runtimeFeatureProperties != null
+            ? runtimeFeatureProperties.getOptimization()
+            : null;
+        if (optimization == null) {
+            return 35.0d;
+        }
+        return Math.max(0.0d, optimization.getMinAcceptableTotalScore());
+    }
+
+    private PlanScore findBestScore(EvaluationReport report) {
+        if (report == null || report.getScores() == null || report.getScores().isEmpty()) {
+            return null;
+        }
+        if (report.getBestPlanId() != null) {
+            for (PlanScore score : report.getScores()) {
+                if (score != null && report.getBestPlanId().equals(score.getPlanId())) {
+                    return score;
+                }
+            }
+        }
+        return report.getScores().stream()
+            .filter(score -> score != null)
+            .max(Comparator.comparingDouble(PlanScore::getTotalScore))
+            .orElse(null);
+    }
+
+    private String buildRetryGuidance(String originalSql, OptimizationRound round) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("上一轮候选方案未达到可接受分数，请重新生成不同思路的方案。").append('\n');
+        sb.append("必须避免重复以下方案形态、SQL 结构或近似索引：").append('\n');
+        for (int i = 0; i < round.candidates().size(); i++) {
+            PlanCandidate candidate = round.candidates().get(i);
+            PlanExecutionResult result = findResult(round.results(), candidate.getPlanId());
+            PlanScore score = findScore(round.report(), candidate.getPlanId());
+            sb.append(i + 1).append(". type=")
+                .append(candidate.getType() == null ? "-" : candidate.getType().toLowerCase(Locale.ROOT));
+            if (candidate.getOptimizedSql() != null && !candidate.getOptimizedSql().isBlank()) {
+                sb.append("; sql=").append(truncate(candidate.getOptimizedSql(), 220));
+            }
+            if (candidate.getIndexDDL() != null && !candidate.getIndexDDL().isBlank()) {
+                sb.append("; indexDDL=").append(truncate(candidate.getIndexDDL(), 180));
+            }
+            if (score != null) {
+                sb.append("; score=").append(String.format(Locale.ROOT, "%.1f", score.getTotalScore()));
+            }
+            if (result != null && result.getExplain() != null) {
+                sb.append("; explainType=").append(result.getExplain().getType());
+                sb.append("; explainRows=").append(result.getExplain().getRows());
+            }
+            if (result != null && result.getExecutionTime() != null) {
+                sb.append("; time=").append(result.getExecutionTime()).append("ms");
+            }
+            sb.append('\n');
+        }
+        sb.append("请优先尝试与上一轮不同的访问路径、不同的改写形态或更有区分度的混合策略。").append('\n');
+        sb.append("如果无法提出更强方案，请宁可少给方案，也不要重复包装上一轮思路。").append('\n');
+        sb.append("原始 SQL: ").append(originalSql.trim());
+        return sb.toString();
+    }
+
+    private PlanExecutionResult findResult(List<PlanExecutionResult> results, String planId) {
+        if (results == null || planId == null) {
+            return null;
+        }
+        return results.stream()
+            .filter(item -> item != null && planId.equals(item.getPlanId()))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private PlanScore findScore(EvaluationReport report, String planId) {
+        if (report == null || report.getScores() == null || planId == null) {
+            return null;
+        }
+        return report.getScores().stream()
+            .filter(item -> item != null && planId.equals(item.getPlanId()))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private record OptimizationRound(
+        List<PlanCandidate> candidates,
+        List<PlanExecutionResult> results,
+        EvaluationReport report
+    ) {}
 
     /**
      * 快速路径判断：对于简单主键查询直接返回，避免调用 AI
@@ -311,7 +448,7 @@ public class UnifiedOptimizationService {
             );
             java.util.regex.Matcher matcher = pattern.matcher(ddlJson);
 
-            java.util.List<String> columns = new java.util.ArrayList<>();
+            List<String> columns = new ArrayList<>();
             while (matcher.find()) {
                 columns.add(matcher.group(1));
             }
